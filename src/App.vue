@@ -2,12 +2,22 @@
 import { RouterLink, RouterView, useRoute } from 'vue-router'
 import { computed } from 'vue'
 import { useThemeStore } from './stores/theme'
+import { useAuthStore } from './stores/auth-store'
+import { useRouter } from 'vue-router'
 
 const themeStore = useThemeStore()
+const authStore = useAuthStore()
+const router = useRouter()
 
 const route = useRoute()
 
 const isAuthPage = computed(() => route.meta.layout === 'auth')
+const isAuthenticated = computed(() => authStore.isAuthenticated)
+
+const handleLogout = async () => {
+  await authStore.logout()
+  router.push('/auth/login')
+}
 </script>
 
 <template>
@@ -16,7 +26,7 @@ const isAuthPage = computed(() => route.meta.layout === 'auth')
       <div class="container top-bar__content">
         <RouterLink to="/" class="brand">
           <span class="brand__mark">✦</span>
-          <div>
+          <div class="brand__text">
             <span class="brand__title">Chronicle Atlas</span>
             <span class="brand__subtitle">Tabletop RPG Manager</span>
           </div>
@@ -28,8 +38,17 @@ const isAuthPage = computed(() => route.meta.layout === 'auth')
         </nav>
         <div class="top-bar__actions">
           <RouterLink v-if="isAuthPage" to="/" class="secondary-button">Назад на сайт</RouterLink>
-          <RouterLink v-else to="/auth/login" class="secondary-button">Войти</RouterLink>
-          <button class="primary-button glow-on-hover" type="button" @click="themeStore.toggleTheme">
+          <template v-else>
+            <button v-if="isAuthenticated" @click="handleLogout" class="secondary-button">
+              Выйти
+            </button>
+            <RouterLink v-else to="/auth/login" class="secondary-button">Войти</RouterLink>
+          </template>
+          <button
+            class="primary-button glow-on-hover"
+            type="button"
+            @click="themeStore.toggleTheme"
+          >
             <span v-if="themeStore.currentTheme === 'dark'">Пергаментное утро</span>
             <span v-else>Письмена под свечой</span>
           </button>
@@ -89,6 +108,12 @@ top-bar {
   gap: 12px;
 }
 
+.brand__text {
+  display: flex;
+  flex-direction: column;
+  line-height: 1;
+}
+
 .brand__mark {
   font-size: 1.6rem;
   color: var(--secondary-color);
@@ -110,7 +135,7 @@ top-bar {
 
 .nav-links {
   display: flex;
-  gap: 18px;
+  gap: 30px;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   font-size: 0.85rem;

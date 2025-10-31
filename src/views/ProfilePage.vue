@@ -1,61 +1,140 @@
 <template>
   <div class="container section">
     <h1 class="section-title">Личный профиль</h1>
-    <p class="subtle-text">
-      Здесь появятся ваши кампании, персонажи и последние свитки хроник. Пока что это витрина с примером.
-    </p>
+    <p class="subtle-text">Здесь появятся ваши кампании, персонажи и последние свитки хроник.</p>
 
-    <div class="profile-grid">
+    <div v-if="authStore.currentUser" class="profile-grid">
       <section class="profile-card">
         <div class="profile-header">
-          <div class="avatar">AR</div>
+          <div class="avatar">
+            {{ getInitials(authStore.currentUser.displayName || authStore.currentUser.username) }}
+          </div>
           <div>
-            <h2>Арина Рунописец</h2>
-            <p class="subtle-text">Хронист, мастер 12 кампаний</p>
+            <h2>{{ authStore.currentUser.displayName }}</h2>
+            <p class="subtle-text">@{{ authStore.currentUser.username }}</p>
+            <p class="subtle-text">{{ authStore.currentUser.email }}</p>
           </div>
         </div>
         <div>
-          <h3>Навыки и роли</h3>
+          <h3>Роли</h3>
           <div class="badge-list">
-            <span class="tag">Dungeon Master</span>
-            <span class="tag">Worldbuilder</span>
-            <span class="tag">Narrator</span>
+            <span v-for="role in authStore.currentUser.roles" :key="role" class="tag">
+              {{ role }}
+            </span>
           </div>
         </div>
         <div>
-          <h3>Текущее приключение</h3>
-          <p class="subtle-text">«Песнь об Утреннем Переплёте» — хроники путешествия по летающим островам.</p>
+          <h3>Учетная запись</h3>
+          <p class="subtle-text">Создана: {{ formatDate(authStore.currentUser.createdAt) }}</p>
+          <p class="subtle-text">
+            Последнее обновление: {{ formatDate(authStore.currentUser.updatedAt) }}
+          </p>
         </div>
       </section>
 
       <section class="profile-card">
-        <h2>Ближайшие сессии</h2>
-        <ul class="timeline">
-          <li class="timeline-item">
-            <h3>Суббота, 19:00</h3>
-            <p class="subtle-text">Кампания: Пламя Эфира. Проверка тайных союзников в столице.</p>
-          </li>
-          <li class="timeline-item">
-            <h3>Среда, 21:00</h3>
-            <p class="subtle-text">One-shot: Таверна «Последний кубик». Импровизационный сюжет.</p>
-          </li>
-        </ul>
-      </section>
-
-      <section class="profile-card">
-        <h2>Награды</h2>
-        <p class="subtle-text">
-          Зарабатывайте достижения за завершённые кампании, участие в событиях сообщества и творчество.
+        <h2>Биография</h2>
+        <p v-if="authStore.currentUser.bio" class="subtle-text">
+          {{ authStore.currentUser.bio }}
         </p>
-        <div class="badge-list">
-          <span class="tag">Легендарный мастер</span>
-          <span class="tag">Хранитель лора</span>
-          <span class="tag">Искатель приключений</span>
-        </div>
+        <p v-else class="subtle-text">Биография не указана.</p>
+      </section>
+
+      <section class="profile-card">
+        <h2>Действия</h2>
+        <button @click="handleLogout" class="secondary-button">Выйти из аккаунта</button>
+      </section>
+    </div>
+
+    <div v-else class="profile-grid">
+      <section class="profile-card">
+        <p class="subtle-text">Загрузка профиля...</p>
       </section>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
+import { onMounted } from 'vue'
+import { useAuthStore } from '@/stores/auth-store'
+import { useRouter } from 'vue-router'
+
+const authStore = useAuthStore()
+const router = useRouter()
+
+// Get user initials for avatar
+const getInitials = (name: string) => {
+  return name
+    .split(' ')
+    .map((part) => part.charAt(0).toUpperCase())
+    .join('')
+    .substring(0, 2)
+}
+
+// Format date
+const formatDate = (dateString: string) => {
+  const options: Intl.DateTimeFormatOptions = {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  }
+  return new Date(dateString).toLocaleDateString('ru-RU', options)
+}
+
+// Handle logout
+const handleLogout = async () => {
+  await authStore.logout()
+  router.push('/auth/login')
+}
+
+// Fetch user data if not already loaded
+onMounted(async () => {
+  if (!authStore.currentUser) {
+    await authStore.fetchCurrentUser()
+  }
+})
 </script>
+
+<style scoped>
+.profile-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 24px;
+  margin-top: 24px;
+}
+
+.profile-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.avatar {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: var(--primary-color);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+  font-weight: bold;
+}
+
+.badge-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.tag {
+  padding: 4px 12px;
+  border-radius: 16px;
+  background: var(--surface-color);
+  border: 1px solid var(--divider-color);
+  font-size: 0.85rem;
+}
+</style>

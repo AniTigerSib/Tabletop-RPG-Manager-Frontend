@@ -1,4 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router'
+import { useAuthStore } from '@/stores/auth-store'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -29,11 +30,42 @@ const router = createRouter({
       path: '/me',
       name: 'profile',
       component: () => import('../views/ProfilePage.vue'),
+      meta: { requiresAuth: true },
     },
   ],
   scrollBehavior() {
     return { top: 0 }
   },
+})
+
+// Route guard to check authentication
+router.beforeEach(async (to, from, next) => {
+  // Initialize auth store
+  const authStore = useAuthStore()
+
+  // Try to initialize auth state from localStorage
+  if (!authStore.isAuthenticated) {
+    authStore.initializeAuth()
+
+    // If we have tokens but no user data, try to fetch user data
+    if (authStore.accessToken && !authStore.user) {
+      await authStore.fetchCurrentUser()
+    }
+  }
+
+  // Check if route requires authentication
+  const requiresAuth = to.matched.some((record) => record.meta.requiresAuth)
+
+  if (requiresAuth && !authStore.isAuthenticated) {
+    // Redirect to login page if not authenticated
+    next({
+      path: '/auth/login',
+      query: { redirect: to.fullPath },
+    })
+  } else {
+    // Allow navigation
+    next()
+  }
 })
 
 export default router
