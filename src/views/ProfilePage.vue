@@ -18,9 +18,10 @@
         <div>
           <h3>Роли</h3>
           <div class="badge-list">
-            <span v-for="role in authStore.currentUser.roles" :key="role" class="tag">
+            <!-- <span v-for="role in authStore.currentUser.roles" :key="role" class="tag">
               {{ role }}
-            </span>
+            </span> -->
+            <p>Здесь в дальнейшем будут роли</p>
           </div>
         </div>
         <div>
