@@ -1,47 +1,41 @@
 <template>
   <div class="container section">
-    <h1 class="section-title">Личный профиль</h1>
-    <p class="subtle-text">Здесь появятся ваши кампании, персонажи и последние свитки хроник.</p>
+    <h1 class="section-title">{{ pageTitle }}</h1>
+    <p class="subtle-text">Здесь появятся кампании, персонажи и последние свитки хроник.</p>
 
-    <div v-if="authStore.currentUser" class="profile-grid">
+    <div v-if="profile && !isLoading" class="profile-grid">
       <section class="profile-card">
         <div class="profile-header">
           <div class="avatar">
-            {{ getInitials(authStore.currentUser.displayName || authStore.currentUser.username) }}
+            {{ getInitials(profile.displayName || profile.username) }}
           </div>
           <div>
-            <h2>{{ authStore.currentUser.displayName }}</h2>
-            <p class="subtle-text">@{{ authStore.currentUser.username }}</p>
-            <p class="subtle-text">{{ authStore.currentUser.email }}</p>
+            <h2>{{ profile.displayName }}</h2>
+            <p class="subtle-text">@{{ profile.username }}</p>
+            <p class="subtle-text">{{ profile.email }}</p>
           </div>
         </div>
         <div>
-          <h3>Роли</h3>
+          <h3>Специализации</h3>
           <div class="badge-list">
-            <!-- <span v-for="role in authStore.currentUser.roles" :key="role" class="tag">
-              {{ role }}
-            </span> -->
-            <p>Здесь в дальнейшем будут роли</p>
+            <p>Здесь в дальнейшем будут специализации (игрок, гейм мастер и т.д.)</p>
           </div>
         </div>
         <div>
           <h3>Учетная запись</h3>
-          <p class="subtle-text">Создана: {{ formatDate(authStore.currentUser.createdAt) }}</p>
-          <p class="subtle-text">
-            Последнее обновление: {{ formatDate(authStore.currentUser.updatedAt) }}
-          </p>
+          <p class="subtle-text">Создана: {{ formatDate(profile.createdAt) }}</p>
         </div>
       </section>
 
       <section class="profile-card">
         <h2>Биография</h2>
-        <p v-if="authStore.currentUser.bio" class="subtle-text">
-          {{ authStore.currentUser.bio }}
+        <p v-if="profile.bio" class="subtle-text">
+          {{ profile.bio }}
         </p>
         <p v-else class="subtle-text">Биография не указана.</p>
       </section>
 
-      <section class="profile-card">
+      <section v-if="isOwnProfile" class="profile-card">
         <h2>Действия</h2>
         <button @click="onLogout" class="secondary-button">Выйти из аккаунта</button>
       </section>
@@ -49,36 +43,73 @@
 
     <div v-else class="profile-grid">
       <section class="profile-card">
-        <p class="subtle-text">Загрузка профиля...</p>
+        <p class="subtle-text">
+          {{ isLoading ? 'Загрузка профиля...' : 'Профиль не найден или недоступен.' }}
+        </p>
       </section>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { onMounted } from 'vue'
+import { computed, onMounted, ref } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth-store'
-import { useRouter } from 'vue-router'
+import { useProfilesStore } from '@/stores/profiles-store'
 import { useAuth } from '@/composables/use-auth'
 import { useFormat } from '@/composables/use-format'
 
 const authStore = useAuthStore()
+const profilesStore = useProfilesStore()
+const route = useRoute()
 const router = useRouter()
 const { handleLogout } = useAuth()
 const { getInitials, formatDate } = useFormat()
 
-// Handle logout
+const isLoading = ref(false)
+
+// Future-friendly: when появится маршрут /user/:id — используем его, иначе считаем профиль своим
+const viewedUserId = computed(() => {
+  const param = route.params.userId
+  if (typeof param === 'string') {
+    const parsed = Number.parseInt(param, 10)
+    return Number.isNaN(parsed) ? undefined : parsed
+  }
+  return undefined
+})
+
+const isOwnProfile = computed(() => viewedUserId.value === undefined)
+
+const profile = computed(() => {
+  if (isOwnProfile.value) {
+    return authStore.currentUser
+  }
+  return profilesStore.profileById(viewedUserId.value)
+})
+
+const pageTitle = computed(() => (isOwnProfile.value ? 'Личный профиль' : 'Профиль пользователя'))
+
 const onLogout = async () => {
   await handleLogout()
   router.push('/auth/login')
 }
 
-// Fetch user data if not already loaded
-onMounted(async () => {
-  if (!authStore.currentUser) {
-    await authStore.fetchCurrentUser()
+const loadProfile = async () => {
+  isLoading.value = true
+  try {
+    if (isOwnProfile.value) {
+      if (!authStore.currentUser) {
+        await authStore.fetchCurrentUser()
+      }
+    } else if (viewedUserId.value !== undefined) {
+      await profilesStore.fetchProfileById(viewedUserId.value)
+    }
+  } finally {
+    isLoading.value = false
   }
-})
+}
+
+onMounted(loadProfile)
 </script>
 
 <style scoped>

@@ -1,12 +1,13 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import { authApi } from '@/api'
+import { authApi, userApi } from '@/api'
 import type { LoginRequest } from '@/dto/request/login-request-dto'
 import type { RegisterRequest } from '@/dto/request/register-request-dto'
 import type { RefreshRequest } from '@/dto/request/refresh-request-dto'
 import type { AuthResponse } from '@/dto/response/auth-response-dto'
 // import type { UserFullProfileResponse } from '@/dto/response/user-full-profile-response-dto'
 import type { BasicUser } from '@/types/basic-user-info'
+import type { SelfUserProfile } from '@/types/self-user-profile'
 
 const AUTH_STORAGE_KEY = 'trpg-auth'
 
@@ -21,10 +22,11 @@ export const useAuthStore = defineStore('auth', () => {
   const accessToken = ref<string | null>(null)
   const refreshToken = ref<string | null>(null)
   const user = ref<BasicUser | null>(null)
+  const userProfile = ref<SelfUserProfile | null>(null)
 
   // Getters
   const isAuthenticated = computed(() => !!user.value)
-  const currentUser = computed(() => user.value)
+  const currentUser = computed(() => userProfile.value)
   const hasRole = computed(() => (role: string) => {
     return user.value?.roles.includes(role) || false
   })
@@ -33,7 +35,7 @@ export const useAuthStore = defineStore('auth', () => {
   const setAuthData = (authResponse: AuthResponse) => {
     accessToken.value = authResponse.accessToken
     refreshToken.value = authResponse.refreshToken
-    user.value = authResponse
+    user.value = { ...authResponse }
     // Store in localStorage for persistence
     if (typeof window !== 'undefined') {
       localStorage.setItem(
@@ -51,6 +53,7 @@ export const useAuthStore = defineStore('auth', () => {
     accessToken.value = null
     refreshToken.value = null
     user.value = null
+    userProfile.value = null
     if (typeof window !== 'undefined') {
       localStorage.removeItem(AUTH_STORAGE_KEY)
     }
@@ -81,6 +84,21 @@ export const useAuthStore = defineStore('auth', () => {
       return true
     } catch (error) {
       console.error('Login failed:', error)
+      return false
+    }
+  }
+
+  const fetchCurrentUser = async (): Promise<boolean> => {
+    if (!accessToken.value) {
+      return false
+    }
+
+    try {
+      const profile = await userApi.getCurrentUser()
+      userProfile.value = profile
+      return true
+    } catch (error) {
+      console.error('Failed to fetch current user:', error)
       return false
     }
   }
@@ -135,6 +153,7 @@ export const useAuthStore = defineStore('auth', () => {
     accessToken,
     refreshToken,
     user,
+    userProfile,
 
     // Getters
     isAuthenticated,
@@ -149,5 +168,6 @@ export const useAuthStore = defineStore('auth', () => {
     register,
     logout,
     refreshTokens,
+    fetchCurrentUser,
   }
 })

@@ -18,10 +18,7 @@ const createApiClient = (): AxiosInstance => {
     (config) => {
       const authStore = useAuthStore()
       if (authStore.accessToken) {
-        console.log('Token sent')
         config.headers.Authorization = `Bearer ${authStore.accessToken}`
-      } else {
-        console.log('Token not sent')
       }
       return config
     },

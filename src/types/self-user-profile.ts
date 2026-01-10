@@ -5,5 +5,5 @@ export interface SelfUserProfile {
   displayName: string
   bio: string | null
   avatarUrl: string | null
-  roles: string[]
+  createdAt: string
 }
