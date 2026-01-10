@@ -4,6 +4,5 @@ export interface AuthResponse {
   tokenType: string
   userId: number
   username: string
-  email: string
-  displayName: string
+  roles: [string]
 }

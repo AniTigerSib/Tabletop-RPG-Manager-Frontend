@@ -43,7 +43,7 @@
 
       <section class="profile-card">
         <h2>Действия</h2>
-        <button @click="handleLogout" class="secondary-button">Выйти из аккаунта</button>
+        <button @click="onLogout" class="secondary-button">Выйти из аккаунта</button>
       </section>
     </div>
 
@@ -59,32 +59,17 @@
 import { onMounted } from 'vue'
 import { useAuthStore } from '@/stores/auth-store'
 import { useRouter } from 'vue-router'
+import { useAuth } from '@/composables/use-auth'
+import { useFormat } from '@/composables/use-format'
 
 const authStore = useAuthStore()
 const router = useRouter()
-
-// Get user initials for avatar
-const getInitials = (name: string) => {
-  return name
-    .split(' ')
-    .map((part) => part.charAt(0).toUpperCase())
-    .join('')
-    .substring(0, 2)
-}
-
-// Format date
-const formatDate = (dateString: string) => {
-  const options: Intl.DateTimeFormatOptions = {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-  }
-  return new Date(dateString).toLocaleDateString('ru-RU', options)
-}
+const { handleLogout } = useAuth()
+const { getInitials, formatDate } = useFormat()
 
 // Handle logout
-const handleLogout = async () => {
-  await authStore.logout()
+const onLogout = async () => {
+  await handleLogout()
   router.push('/auth/login')
 }
 

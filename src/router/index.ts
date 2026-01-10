@@ -43,18 +43,14 @@ router.beforeEach(async (to, from, next) => {
   // Initialize auth store
   const authStore = useAuthStore()
 
-  // Try to initialize auth state from localStorage
-  if (!authStore.isAuthenticated) {
-    authStore.initializeAuth()
-
-    // If we have tokens but no user data, try to fetch user data
-    if (authStore.accessToken && !authStore.user) {
-      await authStore.fetchCurrentUser()
-    }
-  }
-
-  // Check if route requires authentication
   const requiresAuth = to.matched.some((record) => record.meta.requiresAuth)
+  const hasInitializedAuth =
+    authStore.accessToken !== null || authStore.refreshToken !== null || authStore.user !== null
+
+  // Try to initialize auth state from localStorage
+  if (!hasInitializedAuth) {
+    authStore.initializeAuth()
+  }
 
   if (requiresAuth && !authStore.isAuthenticated) {
     // Redirect to login page if not authenticated

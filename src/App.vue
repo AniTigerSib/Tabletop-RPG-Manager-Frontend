@@ -4,18 +4,20 @@ import { computed } from 'vue'
 import { useThemeStore } from './stores/theme'
 import { useAuthStore } from './stores/auth-store'
 import { useRouter } from 'vue-router'
+import { useAuth } from '@/composables/use-auth'
 
 const themeStore = useThemeStore()
 const authStore = useAuthStore()
 const router = useRouter()
+const { handleLogout } = useAuth()
 
 const route = useRoute()
 
 const isAuthPage = computed(() => route.meta.layout === 'auth')
 const isAuthenticated = computed(() => authStore.isAuthenticated)
 
-const handleLogout = async () => {
-  await authStore.logout()
+const onLogout = async () => {
+  await handleLogout()
   router.push('/auth/login')
 }
 </script>
@@ -34,14 +36,12 @@ const handleLogout = async () => {
         <nav class="nav-links" aria-label="Главная навигация">
           <RouterLink to="/" class="nav-link">Главная</RouterLink>
           <RouterLink to="/news" class="nav-link">Новости</RouterLink>
-          <RouterLink to="/me" class="nav-link">Профиль</RouterLink>
+          <RouterLink to="/me" v-if="isAuthenticated" class="nav-link">Профиль</RouterLink>
         </nav>
         <div class="top-bar__actions">
           <RouterLink v-if="isAuthPage" to="/" class="secondary-button">Назад на сайт</RouterLink>
           <template v-else>
-            <button v-if="isAuthenticated" @click="handleLogout" class="secondary-button">
-              Выйти
-            </button>
+            <button v-if="isAuthenticated" @click="onLogout" class="secondary-button">Выйти</button>
             <RouterLink v-else to="/auth/login" class="secondary-button">Войти</RouterLink>
           </template>
           <button
@@ -49,8 +49,8 @@ const handleLogout = async () => {
             type="button"
             @click="themeStore.toggleTheme"
           >
-            <span v-if="themeStore.currentTheme === 'dark'">Пергаментное утро</span>
-            <span v-else>Письмена под свечой</span>
+            <span v-if="themeStore.currentTheme === 'dark'">Светлая тема</span>
+            <span v-else>Темная тема</span>
           </button>
         </div>
       </div>

@@ -7,7 +7,7 @@
           Добро пожаловать обратно! Введите данные учетной записи, чтобы продолжить кампанию.
         </p>
       </div>
-      <form @submit.prevent="handleLogin">
+      <form @submit.prevent="onLogin">
         <div>
           <label for="login">Имя пользователя или Email</label>
           <input
@@ -47,52 +47,18 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive } from 'vue'
-import { useRouter } from 'vue-router'
-import { useAuthStore } from '@/stores/auth-store'
-import type { LoginRequest } from '@/dto/request/login-request-dto'
-import { RouterLink } from 'vue-router'
+import { RouterLink, useRouter } from 'vue-router'
+import { useAuth } from '@/composables/use-auth'
 
 const router = useRouter()
-const authStore = useAuthStore()
+const { loginForm, errorMessage, isLoggingIn, handleLogin } = useAuth()
 
-// Form data
-const loginForm = reactive<LoginRequest>({
-  login: '',
-  password: '',
-})
-
-// State
-const isLoggingIn = ref(false)
-const errorMessage = ref('')
-
-// Login function
-const handleLogin = async () => {
-  // Reset error message
-  errorMessage.value = ''
-
-  // Basic validation
-  if (!loginForm.login.trim() || !loginForm.password) {
-    errorMessage.value = 'Пожалуйста, заполните все поля'
-    return
-  }
-
-  isLoggingIn.value = true
-
-  try {
-    const success = await authStore.login(loginForm)
-
-    if (success) {
-      // Redirect to home page or previous page
-      router.push('/')
-    } else {
-      errorMessage.value = 'Неверное имя пользователя или пароль'
-    }
-  } catch (error) {
-    console.error('Login error:', error)
-    errorMessage.value = 'Произошла ошибка при входе. Пожалуйста, попробуйте позже.'
-  } finally {
-    isLoggingIn.value = false
+// Handle login form submission
+const onLogin = async () => {
+  const success = await handleLogin()
+  if (success) {
+    // Redirect to home page or previous page
+    router.push('/')
   }
 }
 </script>

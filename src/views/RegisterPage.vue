@@ -8,7 +8,7 @@
           других мастеров.
         </p>
       </div>
-      <form @submit.prevent="handleRegister">
+      <form @submit.prevent="onRegister">
         <div>
           <label for="username">Имя пользователя</label>
           <input
@@ -79,80 +79,21 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive } from 'vue'
-import { useRouter } from 'vue-router'
-import { useAuthStore } from '@/stores/auth-store'
-import type { RegisterRequest } from '@/dto/request/register-request-dto'
-import { RouterLink } from 'vue-router'
+import { RouterLink, useRouter } from 'vue-router'
+import { useAuth } from '@/composables/use-auth'
 
 const router = useRouter()
-const authStore = useAuthStore()
+const { registerForm, confirmPassword, errorMessage, isRegistering, handleRegister } = useAuth()
 
-// Form data
-const registerForm = reactive<RegisterRequest>({
-  username: '',
-  email: '',
-  password: '',
-  displayName: '',
-})
-
-const confirmPassword = ref('')
-
-// State
-const isRegistering = ref(false)
-const errorMessage = ref('')
-
-// Registration function
-const handleRegister = async () => {
-  // Reset error message
-  errorMessage.value = ''
-
-  // Validation
-  if (!registerForm.username.trim()) {
-    errorMessage.value = 'Пожалуйста, введите имя пользователя'
-    return
-  }
-
-  if (!registerForm.email.trim()) {
-    errorMessage.value = 'Пожалуйста, введите email'
-    return
-  }
-
-  if (!registerForm.password) {
-    errorMessage.value = 'Пожалуйста, введите пароль'
-    return
-  }
-
-  if (registerForm.password !== confirmPassword.value) {
-    errorMessage.value = 'Пароли не совпадают'
-    return
-  }
-
-  // If displayName is not provided, use username
-  if (!registerForm.displayName) {
-    registerForm.displayName = registerForm.username
-  }
-
-  isRegistering.value = true
-
-  try {
-    const success = await authStore.register(registerForm)
-
-    if (success) {
-      // Redirect to login page with success message
-      router.push({
-        path: '/auth/login',
-        query: { registered: 'true' },
-      })
-    } else {
-      errorMessage.value =
-        'Регистрация не удалась. Возможно, имя пользователя или email уже заняты.'
-    }
-  } catch (error) {
-    console.error('Registration error:', error)
-    errorMessage.value = 'Произошла ошибка при регистрации. Пожалуйста, попробуйте позже.'
-  } finally {
-    isRegistering.value = false
+// Handle registration form submission
+const onRegister = async () => {
+  const success = await handleRegister()
+  if (success) {
+    // Redirect to login page with success message
+    router.push({
+      path: '/auth/login',
+      query: { registered: 'true' },
+    })
   }
 }
 </script>
