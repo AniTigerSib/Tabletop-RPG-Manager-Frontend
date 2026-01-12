@@ -1,0 +1,68 @@
+name: CI/CD
+
+on:
+  push:
+    branches:
+      - master
+  workflow_dispatch:
+
+env:
+  NODE_VERSION: 20
+
+jobs:
+  build:
+    name: Build (self-hosted CI)
+    runs-on: [self-hosted, ci]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build app
+        run: npm run build
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist
+
+  deploy:
+    name: Deploy (self-hosted deploy)
+    runs-on: [self-hosted, cd]
+    needs: build
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist
+
+      - name: Build Docker image on deploy host
+        env:
+          IMAGE_NAME: ${{ vars.DOCKER_IMAGE_NAME || 'tabletop-frontend' }}
+          IMAGE_TAG: ${{ vars.DOCKER_IMAGE_TAG || 'latest' }}
+        run: |
+          docker build -t "$IMAGE_NAME:$IMAGE_TAG" .
+
+      - name: Restart container
+        env:
+          IMAGE_NAME: ${{ vars.DOCKER_IMAGE_NAME || 'tabletop-frontend' }}
+          IMAGE_TAG: ${{ vars.DOCKER_IMAGE_TAG || 'latest' }}
+          CONTAINER_NAME: ${{ vars.CONTAINER_NAME || 'tabletop-frontend' }}
+          HOST_PORT: ${{ vars.HOST_PORT || '8080' }}
+          CONTAINER_PORT: ${{ vars.CONTAINER_PORT || '80' }}
+        run: |
+          docker rm -f "$CONTAINER_NAME" 2>/dev/null || true
+          docker run -d --name "$CONTAINER_NAME" -p "${HOST_PORT}:${CONTAINER_PORT}" "$IMAGE_NAME:$IMAGE_TAG"
