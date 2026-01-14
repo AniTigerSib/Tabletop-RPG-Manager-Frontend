@@ -13,7 +13,7 @@
     "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.node.tsbuildinfo",
 
     "module": "nodenext",
-    "moduleResolution": "Bundler",
+    "moduleResolution": "NodeNext",
     "types": ["node"]
   }
 }

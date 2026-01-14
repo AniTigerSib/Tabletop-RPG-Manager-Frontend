@@ -1,4 +1,4 @@
-import { apiClient } from '@/api'
+import { apiClient } from '@/api/api-client'
 import type { SelfUserProfile } from '@/types/self-user-profile'
 
 export const userApi = {
