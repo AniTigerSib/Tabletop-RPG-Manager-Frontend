@@ -345,7 +345,7 @@ const renderMarkdown = (input: string) => {
         output.push('<ul>')
         inList = true
       }
-      output.push(`<li>${formatInline(listMatch[1])}</li>`)
+      output.push(`<li>${formatInline(listMatch[1] ?? '')}</li>`)
       return
     }
 
@@ -357,8 +357,8 @@ const renderMarkdown = (input: string) => {
 
     const headingMatch = line.match(/^(#{1,3})\s+(.*)$/)
     if (headingMatch) {
-      const level = headingMatch[1].length
-      output.push(`<h${level}>${formatInline(headingMatch[2])}</h${level}>`)
+      const level = (headingMatch[1] ?? '#').length
+      output.push(`<h${level}>${formatInline(headingMatch[2] ?? '')}</h${level}>`)
       return
     }
 
