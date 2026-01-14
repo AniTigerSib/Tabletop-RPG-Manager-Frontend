@@ -8,7 +8,7 @@ import { apiClient } from './api-client'
 // Create a separate axios instance for auth operations (without auth interceptor)
 const createAuthClient = (): AxiosInstance => {
   return axios.create({
-    baseURL: 'http://localhost:8090',
+    baseURL: 'https://tabletop-assistent.ru/api',
     timeout: 10000,
   })
 }
@@ -16,22 +16,22 @@ const createAuthClient = (): AxiosInstance => {
 export const authApi = {
   login: async (loginRequest: LoginRequest): Promise<AuthResponse> => {
     const authClient = createAuthClient()
-    const response = await authClient.post<AuthResponse>('/api/auth/login', loginRequest)
+    const response = await authClient.post<AuthResponse>('/auth/login', loginRequest)
     return response.data
   },
 
   register: async (registerRequest: RegisterRequest): Promise<void> => {
     const authClient = createAuthClient()
-    await authClient.post('/api/auth/register', registerRequest)
+    await authClient.post('/auth/register', registerRequest)
   },
 
   logout: async (): Promise<void> => {
-    await apiClient.post('/api/auth/logout')
+    await apiClient.post('/auth/logout')
   },
 
   refresh: async (refreshRequest: RefreshRequest): Promise<AuthResponse> => {
     const authClient = createAuthClient()
-    const response = await authClient.post<AuthResponse>('/api/auth/refresh', refreshRequest)
+    const response = await authClient.post<AuthResponse>('/auth/refresh', refreshRequest)
     return response.data
   },
 }
