@@ -9,7 +9,7 @@ interface CustomAxiosRequestConfig extends InternalAxiosRequestConfig {
 // Create axios instance with base configuration
 const createApiClient = (): AxiosInstance => {
   const apiClient: AxiosInstance = axios.create({
-    baseURL: 'http://localhost:8090',
+    baseURL: 'https://tabletop-assistent.ru/api',
     timeout: 10000,
   })
 
