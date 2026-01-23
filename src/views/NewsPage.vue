@@ -37,7 +37,7 @@
       </div>
     </div>
 
-    <div class="news-layout">
+    <div class="news-layout" :class="{ 'has-detail': isDetailOpen }">
       <section class="news-feed">
         <div v-if="isLoadingList && !articles.length" class="card">
           <p class="subtle-text">Загружаем новости...</p>
@@ -99,6 +99,9 @@
           <p class="subtle-text">Загружаем выбранную новость...</p>
         </template>
         <template v-else-if="selectedArticle">
+          <button class="secondary-button detail-back" type="button" @click="closeDetail">
+            ← Назад к ленте
+          </button>
           <div class="news-detail__header">
             <div>
               <h2>{{ selectedArticle.title }}</h2>
@@ -192,7 +195,7 @@
                 </div>
               </div>
 
-              <div v-if="editingCommentId === comment.id" class="comment-edit">
+              <div v-if="editingCommentId === comment.id" class="comment-card comment-edit">
                 <textarea v-model="editingCommentText" rows="3" />
                 <div class="comment-actions">
                   <button class="secondary-button" type="button" @click="saveComment(comment)">
@@ -229,7 +232,8 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { newsApi } from '@/api'
 import { useAuthStore } from '@/stores/auth-store'
 import { useFormat } from '@/composables/use-format'
@@ -239,12 +243,15 @@ import type { NewsCommentResponse, NewsDetailResponse } from '@/dto/response/new
 
 const authStore = useAuthStore()
 const { formatDate } = useFormat()
+const route = useRoute()
+const router = useRouter()
 
 const isAdmin = computed(() => authStore.hasRole('ADMIN'))
 const isAuthenticated = computed(() => authStore.isAuthenticated)
 
 const articles = ref<NewsDetailResponse[]>([])
 const selectedArticle = ref<NewsDetailResponse | null>(null)
+const activeArticleId = ref<number | null>(null)
 const errorMessage = ref('')
 
 const page = ref(0)
@@ -275,6 +282,8 @@ const isLoadingComments = ref(false)
 const newComment = ref('')
 const editingCommentId = ref<number | null>(null)
 const editingCommentText = ref('')
+
+const isDetailOpen = computed(() => activeArticleId.value !== null)
 
 const displayAuthor = (author?: { displayName: string; username: string }) => {
   if (!author) return 'Неизвестный автор'
@@ -381,6 +390,44 @@ const syncArticle = (updated: NewsDetailResponse) => {
   }
 }
 
+const clearSelection = () => {
+  selectedArticle.value = null
+  activeArticleId.value = null
+  isEditing.value = false
+  resetCommentsState()
+}
+
+const buildQuery = () => {
+  const query: Record<string, string> = {}
+  Object.entries(route.query).forEach(([key, value]) => {
+    if (typeof value === 'string') {
+      query[key] = value
+    }
+  })
+  return query
+}
+
+const updateArticleRoute = (articleId: number | null, replace = false) => {
+  const query = buildQuery()
+  if (articleId === null) {
+    delete query.article
+  } else {
+    query.article = String(articleId)
+  }
+  if (replace) {
+    router.replace({ path: route.path, query })
+  } else {
+    router.push({ path: route.path, query })
+  }
+}
+
+const getArticleIdFromRoute = () => {
+  const value = route.query.article
+  if (typeof value !== 'string') return null
+  const parsed = Number(value)
+  return Number.isFinite(parsed) ? parsed : null
+}
+
 const resetCommentsState = () => {
   comments.value = []
   commentPage.value = 0
@@ -415,10 +462,15 @@ const loadNews = async (reset = false) => {
   }
 }
 
-const selectArticle = async (articleId: number) => {
+const selectArticle = async (articleId: number, updateRoute = true) => {
   if (isLoadingDetail.value) return
   isLoadingDetail.value = true
   errorMessage.value = ''
+  activeArticleId.value = articleId
+
+  if (updateRoute) {
+    updateArticleRoute(articleId)
+  }
 
   try {
     const response = await newsApi.getNewsArticle(articleId)
@@ -430,9 +482,17 @@ const selectArticle = async (articleId: number) => {
   } catch (error) {
     console.error('Failed to load article:', error)
     errorMessage.value = 'Не удалось загрузить новость.'
+    if (!selectedArticle.value) {
+      activeArticleId.value = null
+    }
   } finally {
     isLoadingDetail.value = false
   }
+}
+
+const closeDetail = () => {
+  updateArticleRoute(null, true)
+  clearSelection()
 }
 
 const loadMore = async () => {
@@ -541,6 +601,8 @@ const removeArticle = async () => {
     selectedArticle.value = null
     isEditing.value = false
     resetCommentsState()
+    updateArticleRoute(null, true)
+    activeArticleId.value = null
   } catch (error) {
     console.error('Failed to delete news:', error)
     errorMessage.value = 'Не удалось удалить новость.'
@@ -667,6 +729,26 @@ const removeComment = async (comment: NewsCommentResponse) => {
 onMounted(() => {
   loadNews(true)
 })
+
+watch(
+  () => route.query.article,
+  () => {
+    const routeArticleId = getArticleIdFromRoute()
+    if (routeArticleId === null) {
+      if (activeArticleId.value !== null) {
+        clearSelection()
+      }
+      return
+    }
+
+    if (activeArticleId.value === routeArticleId) {
+      return
+    }
+
+    selectArticle(routeArticleId, false)
+  },
+  { immediate: true },
+)
 </script>
 
 <style scoped>
@@ -721,15 +803,33 @@ onMounted(() => {
 }
 
 .news-layout {
-  display: grid;
+  display: flex;
   gap: 24px;
-  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+  align-items: flex-start;
+  position: relative;
+  overflow: hidden;
+}
+
+.news-layout.has-detail {
+  gap: 0;
 }
 
 .news-feed {
   display: flex;
   flex-direction: column;
   gap: 18px;
+  flex: 1.2 1 0%;
+  transition:
+    transform 0.4s ease,
+    opacity 0.4s ease,
+    max-width 0.4s ease;
+}
+
+.news-layout.has-detail .news-feed {
+  transform: translateX(-120%);
+  opacity: 0;
+  pointer-events: none;
+  max-width: 0;
 }
 
 .news-card {
@@ -750,9 +850,16 @@ onMounted(() => {
   gap: 12px;
 }
 
+.news-card__header h2 {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
 .news-card__summary {
   color: var(--text-secondary-color);
   margin: 0;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .news-card__footer {
@@ -776,6 +883,20 @@ onMounted(() => {
   display: flex;
   flex-direction: column;
   gap: 20px;
+  flex: 1 1 0%;
+  transition:
+    transform 0.4s ease,
+    opacity 0.4s ease;
+}
+
+.news-layout.has-detail .news-detail {
+  flex: 1 1 100%;
+  transform: translateX(0);
+  opacity: 1;
+}
+
+.detail-back {
+  align-self: flex-start;
 }
 
 .news-detail__header {
@@ -783,6 +904,11 @@ onMounted(() => {
   align-items: flex-start;
   justify-content: space-between;
   gap: 16px;
+}
+
+.news-detail__header h2 {
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .detail-actions {
@@ -794,16 +920,22 @@ onMounted(() => {
   display: flex;
   flex-direction: column;
   gap: 16px;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .news-summary {
   font-style: italic;
   margin: 0;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .news-body {
   white-space: pre-wrap;
   line-height: 1.6;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .news-body h1,
@@ -903,6 +1035,7 @@ onMounted(() => {
   border: 1px solid var(--divider-color);
   background: var(--surface-elevated);
   color: var(--text-color);
+  resize: none;
 }
 
 .comment-card {
@@ -925,6 +1058,17 @@ onMounted(() => {
 .comment-card__body {
   margin: 0;
   white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.comment-edit textarea {
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--divider-color);
+  background: var(--surface-elevated);
+  color: var(--text-color);
+  resize: none;
 }
 
 .comment-actions {
@@ -950,7 +1094,7 @@ onMounted(() => {
 
 @media (max-width: 960px) {
   .news-layout {
-    grid-template-columns: 1fr;
+    flex-direction: column;
   }
 
   .news-header {
