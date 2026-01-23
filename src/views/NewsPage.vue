@@ -29,6 +29,18 @@
           Текст новости
           <textarea v-model="createForm.content" rows="6" placeholder="Полный текст" />
         </label>
+        <label class="field">
+          Обложка новости
+          <input
+            :key="createImageInputKey"
+            type="file"
+            accept="image/*"
+            @change="onCreateImageChange"
+          />
+        </label>
+      </div>
+      <div v-if="createImagePreview" class="news-image-preview">
+        <img :src="createImagePreview" alt="Предпросмотр обложки" />
       </div>
       <div class="form-actions">
         <button class="primary-button" type="button" @click="createArticle" :disabled="isSubmitting">
@@ -52,6 +64,13 @@
           class="card news-card"
           :class="{ selected: selectedArticle?.id === article.id }"
         >
+          <img
+            v-if="article.imageUrl"
+            class="news-card__image"
+            :src="article.imageUrl"
+            :alt="article.title"
+            loading="lazy"
+          />
           <div class="news-card__header">
             <div>
               <h2>{{ article.title }}</h2>
@@ -102,6 +121,9 @@
           <button class="secondary-button detail-back" type="button" @click="closeDetail">
             ← Назад к ленте
           </button>
+          <div v-if="detailImage" class="news-detail__image">
+            <img :src="detailImage" :alt="selectedArticle.title" />
+          </div>
           <div class="news-detail__header">
             <div>
               <h2>{{ selectedArticle.title }}</h2>
@@ -129,6 +151,26 @@
               Текст новости
               <textarea v-model="editForm.content" rows="6" />
             </label>
+            <label class="field">
+              Обложка новости
+              <input
+                :key="editImageInputKey"
+                type="file"
+                accept="image/*"
+                @change="onEditImageChange"
+              />
+            </label>
+            <div v-if="editImagePreview" class="news-image-preview">
+              <img :src="editImagePreview" alt="Предпросмотр новой обложки" />
+            </div>
+            <button
+              v-if="selectedArticle.imageUrl"
+              class="danger-button subtle-button"
+              type="button"
+              @click="removeImage"
+            >
+              Удалить обложку
+            </button>
             <div class="form-actions">
               <button class="primary-button" type="button" @click="saveEdit">Сохранить</button>
               <button class="secondary-button" type="button" @click="cancelEdit">Отмена</button>
@@ -266,6 +308,9 @@ const createForm = reactive<CreateNewsRequest>({
   summary: '',
   content: '',
 })
+const createImageFile = ref<File | null>(null)
+const createImagePreview = ref<string | null>(null)
+const createImageInputKey = ref(0)
 
 const isEditing = ref(false)
 const editForm = reactive<UpdateNewsRequest>({
@@ -273,6 +318,9 @@ const editForm = reactive<UpdateNewsRequest>({
   summary: '',
   content: '',
 })
+const editImageFile = ref<File | null>(null)
+const editImagePreview = ref<string | null>(null)
+const editImageInputKey = ref(0)
 
 const comments = ref<NewsCommentResponse[]>([])
 const commentPage = ref(0)
@@ -284,6 +332,7 @@ const editingCommentId = ref<number | null>(null)
 const editingCommentText = ref('')
 
 const isDetailOpen = computed(() => activeArticleId.value !== null)
+const detailImage = computed(() => editImagePreview.value || selectedArticle.value?.imageUrl || null)
 
 const displayAuthor = (author?: { displayName: string; username: string }) => {
   if (!author) return 'Неизвестный автор'
@@ -380,6 +429,39 @@ const renderMarkdown = (input: string) => {
   return output.join('')
 }
 
+const setImagePreview = (file: File | null, target: typeof createImagePreview) => {
+  if (target.value) {
+    URL.revokeObjectURL(target.value)
+  }
+  target.value = file ? URL.createObjectURL(file) : null
+}
+
+const resetCreateImage = () => {
+  createImageFile.value = null
+  setImagePreview(null, createImagePreview)
+  createImageInputKey.value += 1
+}
+
+const resetEditImage = () => {
+  editImageFile.value = null
+  setImagePreview(null, editImagePreview)
+  editImageInputKey.value += 1
+}
+
+const onCreateImageChange = (event: Event) => {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0] ?? null
+  createImageFile.value = file
+  setImagePreview(file, createImagePreview)
+}
+
+const onEditImageChange = (event: Event) => {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0] ?? null
+  editImageFile.value = file
+  setImagePreview(file, editImagePreview)
+}
+
 const syncArticle = (updated: NewsDetailResponse) => {
   const index = articles.value.findIndex((item) => item.id === updated.id)
   if (index >= 0) {
@@ -394,6 +476,7 @@ const clearSelection = () => {
   selectedArticle.value = null
   activeArticleId.value = null
   isEditing.value = false
+  resetEditImage()
   resetCommentsState()
 }
 
@@ -476,6 +559,7 @@ const selectArticle = async (articleId: number, updateRoute = true) => {
     const response = await newsApi.getNewsArticle(articleId)
     selectedArticle.value = response
     isEditing.value = false
+    resetEditImage()
     syncArticle(response)
     resetCommentsState()
     await loadComments(true)
@@ -540,13 +624,23 @@ const createArticle = async () => {
       summary: createForm.summary?.trim() || '',
       content: createForm.content.trim(),
     })
-    articles.value = [response, ...articles.value]
-    selectedArticle.value = response
+    let createdArticle = response
+    if (createImageFile.value) {
+      try {
+        createdArticle = await newsApi.uploadNewsImage(response.id, createImageFile.value)
+      } catch (imageError) {
+        console.error('Failed to upload image:', imageError)
+        errorMessage.value = 'Новость опубликована, но обложку загрузить не удалось.'
+      }
+    }
+    articles.value = [createdArticle, ...articles.value]
+    selectedArticle.value = createdArticle
     isEditing.value = false
     resetCommentsState()
     createForm.title = ''
     createForm.summary = ''
     createForm.content = ''
+    resetCreateImage()
   } catch (error) {
     console.error('Failed to create news:', error)
     errorMessage.value = 'Не удалось опубликовать новость.'
@@ -561,10 +655,12 @@ const startEdit = () => {
   editForm.title = selectedArticle.value.title
   editForm.summary = selectedArticle.value.summary
   editForm.content = selectedArticle.value.content
+  resetEditImage()
 }
 
 const cancelEdit = () => {
   isEditing.value = false
+  resetEditImage()
 }
 
 const saveEdit = async () => {
@@ -581,8 +677,20 @@ const saveEdit = async () => {
       summary: editForm.summary?.trim() || '',
       content: editForm.content.trim(),
     })
-    syncArticle(response)
+    let updatedArticle = response
+    if (editImageFile.value) {
+      try {
+        updatedArticle = updatedArticle.imageUrl
+          ? await newsApi.updateNewsImage(updatedArticle.id, editImageFile.value)
+          : await newsApi.uploadNewsImage(updatedArticle.id, editImageFile.value)
+      } catch (imageError) {
+        console.error('Failed to update image:', imageError)
+        errorMessage.value = 'Текст обновлен, но изображение обновить не удалось.'
+      }
+    }
+    syncArticle(updatedArticle)
     isEditing.value = false
+    resetEditImage()
   } catch (error) {
     console.error('Failed to update news:', error)
     errorMessage.value = 'Не удалось обновить новость.'
@@ -606,6 +714,22 @@ const removeArticle = async () => {
   } catch (error) {
     console.error('Failed to delete news:', error)
     errorMessage.value = 'Не удалось удалить новость.'
+  }
+}
+
+const removeImage = async () => {
+  if (!selectedArticle.value || !isAdmin.value) return
+
+  const shouldDelete = window.confirm('Удалить обложку новости?')
+  if (!shouldDelete) return
+
+  try {
+    const response = await newsApi.deleteNewsImage(selectedArticle.value.id)
+    syncArticle(response)
+    resetEditImage()
+  } catch (error) {
+    console.error('Failed to delete image:', error)
+    errorMessage.value = 'Не удалось удалить обложку.'
   }
 }
 
@@ -838,6 +962,14 @@ watch(
   gap: 12px;
 }
 
+.news-card__image {
+  width: 100%;
+  max-height: 220px;
+  object-fit: cover;
+  border-radius: 12px;
+  border: 1px solid var(--divider-color);
+}
+
 .news-card.selected {
   border-color: var(--primary-color);
   box-shadow: var(--hover-glow), var(--card-shadow);
@@ -904,6 +1036,33 @@ watch(
   align-items: flex-start;
   justify-content: space-between;
   gap: 16px;
+}
+
+.news-detail__image {
+  width: 100%;
+  border-radius: 16px;
+  overflow: hidden;
+  border: 1px solid var(--divider-color);
+}
+
+.news-detail__image img {
+  display: block;
+  width: 100%;
+  max-height: 320px;
+  object-fit: cover;
+}
+
+.news-image-preview {
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px dashed var(--divider-color);
+}
+
+.news-image-preview img {
+  display: block;
+  width: 100%;
+  max-height: 240px;
+  object-fit: cover;
 }
 
 .news-detail__header h2 {
@@ -1009,6 +1168,10 @@ watch(
   padding: 10px 18px;
   border-radius: 999px;
   cursor: pointer;
+}
+
+.subtle-button {
+  align-self: flex-start;
 }
 
 .comments {

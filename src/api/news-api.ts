@@ -33,6 +33,25 @@ export const newsApi = {
     return response.data
   },
 
+  uploadNewsImage: async (articleId: number, file: File): Promise<NewsDetailResponse> => {
+    const formData = new FormData()
+    formData.append('file', file)
+    const response = await apiClient.post<NewsDetailResponse>(`/news/${articleId}/image`, formData)
+    return response.data
+  },
+
+  updateNewsImage: async (articleId: number, file: File): Promise<NewsDetailResponse> => {
+    const formData = new FormData()
+    formData.append('file', file)
+    const response = await apiClient.put<NewsDetailResponse>(`/news/${articleId}/image`, formData)
+    return response.data
+  },
+
+  deleteNewsImage: async (articleId: number): Promise<NewsDetailResponse> => {
+    const response = await apiClient.delete<NewsDetailResponse>(`/news/${articleId}/image`)
+    return response.data
+  },
+
   deleteNews: async (articleId: number): Promise<void> => {
     await apiClient.delete(`/news/${articleId}`)
   },

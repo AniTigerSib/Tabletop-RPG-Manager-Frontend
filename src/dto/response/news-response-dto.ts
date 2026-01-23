@@ -9,6 +9,7 @@ export interface NewsDetailResponse {
   id: number
   title: string
   summary: string
+  imageUrl: string | null
   content: string
   createdAt: string
   updatedAt: string
